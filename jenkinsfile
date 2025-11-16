@@ -1,0 +1,106 @@
+pipeline {
+    agent any
+
+    tools {
+        nodejs 'NodeJS16'   // NodeJS tool configured in Jenkins
+    }
+
+    environment {
+        // Docker Image Tag
+        DOCKER_IMAGE = "subhansmd6/appointments-app:0.0.1-${BUILD_NUMBER}"
+
+        // Nexus RAW repository details
+        NEXUS_URL = "18.237.206.230:8081"
+        NEXUS_REPO = "Appointments-app"
+        NEXUS_CREDENTIALS = "nexus-details"
+
+        // Sonar token
+        SONAR_TOKEN = credentials('sonar-token')
+    }
+
+    stages {
+
+        /* 1. CLONE GITHUB */
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/subhansmd6/Appointments-App.git'
+            }
+        }
+
+        /* 2. INSTALL REACT APP DEPENDENCIES */
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install'
+            }
+        }
+
+        /* 3. SONARQUBE SCAN */
+        stage('SonarQube Analysis') {
+            steps {
+                sh """
+                    npx sonar-scanner \
+                      -Dsonar.projectKey=react-project \
+                      -Dsonar.sources=src \
+                      -Dsonar.host.url=http://sonarqube1:9000 \
+                      -Dsonar.login=${SONAR_TOKEN}
+                """
+            }
+        }
+
+        /* 4. BUILD REACT APP */
+        stage('Build React App') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        /* 5. UPLOAD BUILD ARTIFACTS TO NEXUS RAW REPO */
+        stage('Upload Build to Nexus') {
+            steps {
+                dir('build') {
+                    withCredentials([usernamePassword(
+                        credentialsId: "${NEXUS_CREDENTIALS}",
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
+                    )]) {
+                        sh """
+                            echo "Uploading build files to Nexus RAW repository..."
+
+                            for file in \$(find . -type f); do
+                                echo "Uploading: \$file"
+                                curl -u "$NEXUS_USER:$NEXUS_PASS" \
+                                  --upload-file "\$file" \
+                                  "http://${NEXUS_URL}/repository/${NEXUS_REPO}/\${file}"
+                            done
+                        """
+                    }
+                }
+            }
+        }
+
+        /* 6. BUILD DOCKER IMAGE */
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${DOCKER_IMAGE} ."
+            }
+        }
+
+        /* 7. PUSH IMAGE TO DOCKER HUB */
+        stage('Push Docker Image') {
+            steps {
+                withDockerRegistry([credentialsId: 'dockerhub-details', url: '']) {
+                    sh "docker push ${DOCKER_IMAGE}"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "SUCCESS! Docker image pushed → ${DOCKER_IMAGE}"
+        }
+        failure {
+            echo "Pipeline Failed!"
+        }
+    }
+}
