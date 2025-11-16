@@ -37,7 +37,7 @@ jobs:
           npx sonar-scanner \
             -Dsonar.projectKey=react-project \
             -Dsonar.sources=src \
-            -Dsonar.host.url=http://sonarqube1:9000 \
+            -Dsonar.host.url=http://18.237.206.230/:9000 \
             -Dsonar.login=${SONAR_TOKEN}
 
       # 5️⃣ Build React app
