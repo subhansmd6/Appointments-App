@@ -28,6 +28,7 @@ jobs:
       # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
+        working-directory: Appointments-App
 
       # 4️⃣ SonarQube Analysis
       - name: SonarQube Scan
@@ -39,10 +40,12 @@ jobs:
             -Dsonar.sources=src \
             -Dsonar.host.url=http://18.237.206.230:9000 \
             -Dsonar.login=${SONAR_TOKEN}
+        working-directory: Appointments-App
 
       # 5️⃣ Build React app
       - name: Build React app
         run: npm run build
+        working-directory: Appointments-App
 
       # 6️⃣ Upload build to Nexus RAW repository
       - name: Upload build to Nexus
@@ -50,23 +53,25 @@ jobs:
           NEXUS_USER: ${{ secrets.NEXUS_USER }}
           NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
         run: |
-          cd build
           for file in $(find . -type f); do
             echo "Uploading: $file"
             curl -u "$NEXUS_USER:$NEXUS_PASS" \
                  --upload-file "$file" \
                  "http://${NEXUS_URL}/repository/${NEXUS_REPO}/${file}"
-          done
+        working-directory: Appointments-App/build
 
-      # 7️⃣ Build and push Docker image
+      # 7️⃣ Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      # 8️⃣ Build and push Docker image
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
+          context: Appointments-App        # Set correct Docker build context
+          file: Appointments-App/Dockerfile # Explicitly specify Dockerfile
           push: true
           tags: ${{ env.DOCKER_IMAGE }}
