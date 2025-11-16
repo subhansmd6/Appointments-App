@@ -1,41 +1,19 @@
-# Install dependencies
-- name: Install dependencies
-  run: npm install
+name: React App CI/CD
 
-# SonarQube Scan
-- name: SonarQube Scan
-  env:
-    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  run: |
-    npx sonar-scanner \
-      -Dsonar.projectKey=react-project \
-      -Dsonar.sources=src \
-      -Dsonar.host.url=http://18.237.206.230:9000 \
-      -Dsonar.login=${SONAR_TOKEN}
+on:
+  push:
+    branches:
+      - main
 
-# Build React app
-- name: Build React app
-  run: npm run build
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
-# Upload build to Nexus
-- name: Upload build to Nexus
-  env:
-    NEXUS_USER: ${{ secrets.NEXUS_USER }}
-    NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
-  run: |
-    cd build
-    for file in $(find . -type f); do
-      echo "Uploading: $file"
-      curl -u "$NEXUS_USER:$NEXUS_PASS" \
-           --upload-file "$file" \
-           "http://${NEXUS_URL}/repository/${NEXUS_REPO}/${file}"
-    done
+    env:
+      DOCKER_IMAGE: subhansmd6/appointments-app:${{ github.run_number }}
+      NEXUS_URL: 18.237.206.230:8081
+      NEXUS_REPO: Appointments-app
 
-# Docker build
-- name: Build and push Docker image
-  uses: docker/build-push-action@v4
-  with:
-    context: .
-    file: ./Dockerfile
-    push: true
-    tags: ${{ env.DOCKER_IMAGE }}
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout code
